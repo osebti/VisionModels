@@ -5,9 +5,7 @@ import torch.nn.functional as F
 
 from typing import Tuple
 
-"""
-NOTE: you can add as many functions as you need in this file, and for all the classes you can define extra methods if you need
-"""
+
 
 def sinusoidal_embedding(n, d):
   # Returns the standard positional embedding
