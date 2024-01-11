@@ -1,0 +1,265 @@
+
+
+import torch
+import torch.optim as optim
+from sklearn.model_selection import GridSearchCV
+from sklearn.linear_model import LogisticRegression
+
+import torch.nn as nn 
+from torch.utils.data import random_split
+from torchvision import transforms, datasets
+import torch
+import torchvision
+from torch.autograd import Variable
+import torch.nn.functional as F
+
+
+
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+epoch=15
+
+one_hot = torch.nn.functional.one_hot
+
+
+def loss(data_loader,model):
+  model.eval()
+  loss = 0
+  correct = 0
+  with torch.no_grad(): # notice the use of no_grad
+    for data, target in data_loader:
+        data = data.to(device)
+        target = target.to(device)
+        output = model(data)
+        pred = output.data.max(1, keepdim=True)[1]
+        correct += pred.eq(target.data.view_as(pred)).sum()
+        loss += F.cross_entropy(output, one_hot(target,num_classes=10).float(), size_average=False).item()
+  loss /= len(data_loader.dataset)
+  return loss
+
+
+def eval(data_loader,model,dataset):
+  model.eval()
+  loss = 0
+  correct = 0
+  with torch.no_grad(): # notice the use of no_grad
+    for data, target in data_loader:
+        data = data.to(device)
+        target = target.to(device)
+        output = model(data)
+        pred = output.data.max(1, keepdim=True)[1]
+        correct += pred.eq(target.data.view_as(pred)).sum()
+        loss += F.cross_entropy(output, one_hot(target,num_classes=10).float(), size_average=False).item()
+  loss /= len(data_loader.dataset)
+  print(dataset+'set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(loss, correct, len(data_loader.dataset), 100. * correct / len(data_loader.dataset)))
+
+def accuracy(data_loader,model):
+  model.eval()
+  correct = 0
+  with torch.no_grad(): # notice the use of no_grad
+    for data, target in data_loader:
+        data = data.to(device)
+        target = target.to(device)
+        output = model(data)
+        pred = output.data.max(1, keepdim=True)[1]
+        correct += pred.eq(target.data.view_as(pred)).sum()
+    accuracy=float(100. * correct / len(data_loader.dataset))
+    return accuracy
+
+
+class MultipleLogisticRegression(nn.Module):
+    def __init__(self,name):
+        if(name=="MNIST"):
+            super(MultipleLogisticRegression, self).__init__()
+            self.linear = torch.nn.Linear(28*28, 10)
+
+        elif(name=="CIFAR10"):
+            super(MultipleLogisticRegression, self).__init__()
+            self.linear = torch.nn.Linear(3*32*32, 10)
+
+
+    def forward(self, x):
+        x = x.view(x.size(0), -1)
+        y = self.linear(x)
+        return y
+
+        
+
+def train(epoch,data_loader,model,optimizer):
+  model.train()
+  for batch_idx, (data, target) in enumerate(data_loader):
+    data = data.to(device)
+    target = target.to(device)
+    optimizer.zero_grad()
+    output = model(data)
+    loss = F.cross_entropy(output, one_hot(target,num_classes=10).float())
+    loss.backward()
+    optimizer.step()
+
+
+
+def logistic_regression(dataset_name, device):
+
+    if (dataset_name=="MNIST"):
+
+        training = torchvision.datasets.MNIST('./MNIST_dataset/', train=True, download=True,
+                             transform=torchvision.transforms.Compose([
+                               torchvision.transforms.ToTensor(),
+                               torchvision.transforms.Normalize((0.1307,), (0.3081,))]))
+        training_set, validation_set = random_split(training, [48000, 12000])
+        validation_loader = torch.utils.data.DataLoader(validation_set,batch_size=1000, shuffle=True)
+        data_loader = torch.utils.data.DataLoader(training_set,batch_size=160, shuffle=True)  
+
+        # TODO: implement logistic regression here
+        reg_model=MultipleLogisticRegression("MNIST").to(device)
+
+        optimizer = optim.SGD(reg_model.parameters(), lr=4e-2,weight_decay=0.001)
+
+        for i in range(8):
+            train(epoch,data_loader,reg_model,optimizer)
+            eval(validation_loader,reg_model,"Validation")
+
+
+        results = dict(
+            model=reg_model
+        )
+
+        return results
+
+
+    elif(dataset_name=="CIFAR10"):
+        training = torchvision.datasets.CIFAR10('./data', train=True, download=True,
+                             transform=torchvision.transforms.Compose([
+                               torchvision.transforms.ToTensor(),
+                               transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]))
+
+
+        training_set, validation_set = random_split(training, [38000, 12000])
+        validation_loader = torch.utils.data.DataLoader(validation_set,batch_size=500, shuffle=True)
+        data_loader = torch.utils.data.DataLoader(training_set,batch_size=80, shuffle=True)  
+        # TODO: implement logistic regression here
+        reg_model=MultipleLogisticRegression("CIFAR10").to(device)
+        
+        # best lr = 3e-3
+        optimizer = optim.SGD(reg_model.parameters(), lr=3e-3,weight_decay=0.001)
+    
+        for i in range(12):
+            train(epoch,data_loader,reg_model,optimizer)
+            eval(validation_loader,reg_model,"Validation")
+
+
+        results = dict(
+            model=reg_model
+        )
+
+        return results
+
+
+def tune_hyper_parameter(dataset_name, target_metric, device):
+    # TODO: implement logistic regression hyper-parameter tuning here
+
+    # Define a dict to go over all combinations of hyperparameters
+
+    grid={"learning_rate":[3e-3,4e-2],
+    "batch_sizes":[32,80,160],
+    "epochs":[8],
+    "gamma":[0.001],
+    "optimizers":["sgd","adam"]}
+
+
+    best_params ={"learning_rate":0,
+    "batch_size":None,
+    "epochs":8,
+    "gamma":0.001,
+    "optimizers": None}
+
+
+    best_metric = 0
+    best_loss=1e6
+    epochs=8 # constant 
+    gamma=0.001
+
+    if(dataset_name=="CIFAR10"):
+        training = torchvision.datasets.CIFAR10('./data', train=True, download=True,
+                transform=torchvision.transforms.Compose([
+                torchvision.transforms.ToTensor(),
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]))
+        training_set, validation_set = random_split(training, [38000, 12000])
+        validation_loader = torch.utils.data.DataLoader(validation_set,batch_size=500, shuffle=True)
+        data_loader = torch.utils.data.DataLoader(training_set,batch_size=128, shuffle=True) 
+    
+
+    if(dataset_name=="MNIST"):
+
+        training = torchvision.datasets.MNIST('./MNIST_dataset/', train=True, download=True,
+        transform=torchvision.transforms.Compose([
+        torchvision.transforms.ToTensor(),
+        torchvision.transforms.Normalize((0.1307,), (0.3081,))]))
+
+        training_set, validation_set = random_split(training, [48000, 12000])
+        validation_loader = torch.utils.data.DataLoader(validation_set,batch_size=500, shuffle=True)
+        data_loader = torch.utils.data.DataLoader(training_set,batch_size=1, shuffle=True) 
+        
+
+
+    for j in range(3): # go over all learning rate options
+        batch_size=grid["batch_sizes"][j]
+        data_loader = torch.utils.data.DataLoader(training_set,batch_size=batch_size, shuffle=True) 
+        for i in range(2): # go over batch_sizes
+            lr=grid["learning_rate"][i]
+            for z in range(2): # go over sgd, adam
+                opt=grid["optimizers"][z]
+
+                if(opt=="adam"):         
+                    
+                    reg_model=MultipleLogisticRegression(dataset_name).to(device) # initialize new model
+                    optimizer = optim.Adam(reg_model.parameters(), lr=lr,weight_decay=gamma)
+                    for ep in range(epochs):
+                        train(epoch,data_loader,reg_model,optimizer)
+
+                    if (target_metric=="acc"):
+                        current=accuracy(validation_loader,reg_model)
+                        if current>best_metric:
+                            best_metric=current
+                            best_params["learning_rate"]=grid["learning_rate"][i]
+                            best_params["batch_size"]=grid["batch_sizes"][j]
+                            best_params["optimizers"]=grid["optimizers"][z]
+
+                    if(target_metric=="loss"):
+                        current=loss(validation_loader,reg_model)
+                        if current<best_loss:
+                            best_loss=current
+                            best_metric=current
+                            best_params["learning_rate"]=grid["learning_rate"][i]
+                            best_params["batch_size"]=grid["batch_sizes"][j]
+                            best_params["optimizers"]=grid["optimizers"][z]
+
+
+
+                else: # optimizer = sgd
+                    reg_model = MultipleLogisticRegression(dataset_name).to(device)
+                    optimizer = optim.SGD(reg_model.parameters(), lr=lr,weight_decay=gamma)
+                        
+                    for ep in range(epochs):
+                        train(epoch,data_loader,reg_model,optimizer)
+
+                    if (target_metric=="acc"):
+                        current=accuracy(validation_loader,reg_model)
+                        if current>best_metric:
+                            best_metric=current
+                            best_params["learning_rate"]=grid["learning_rate"][i]
+                            best_params["batch_size"]=grid["batch_sizes"][j]
+                            best_params["optimizers"]=grid["optimizers"][z]
+
+
+                    if(target_metric=="loss"):
+                        current=loss(validation_loader,reg_model)
+                        if current<best_loss:
+                            best_loss=current
+                            best_metric=current
+                            best_params["learning_rate"]=grid["learning_rate"][i]
+                            best_params["batch_size"]=grid["batch_sizes"][j]
+                            best_params["optimizers"]=grid["optimizers"][z]
+
+
+    return best_params, best_metric
