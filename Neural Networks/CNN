@@ -1,0 +1,175 @@
+import timeit
+from collections import OrderedDict
+
+import torch
+from torchvision import transforms, datasets
+
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.utils.data import random_split
+
+
+
+batch_size_test = 1000
+torch.manual_seed(1)
+
+
+
+
+#TO DO: Complete this with your CNN architecture. Make sure to complete the architecture requirements.
+#The init has in_channels because this changes based on the dataset. 
+
+class Net(nn.Module):
+    def __init__(self, in_channels):
+        super(Net, self).__init__()
+        if(in_channels==1):
+            self.conv1 = nn.Conv2d(1, 6, kernel_size=3)
+            self.conv2 = nn.Conv2d(6, 16, kernel_size=3)
+            self.fc1 = nn.Linear(400, 120)
+            self.fc2 = nn.Linear(120, 84)
+            self.fc3 = nn.Linear(84, 10)
+            self.learning_rate=1e-3
+            self.n_epochs = 8
+            self.batch_size=32
+
+            return
+
+        elif(in_channels==3): # rgb images 
+            self.conv1 = nn.Conv2d(3, 18, kernel_size=3)
+            self.conv2 = nn.Conv2d(18, 36, kernel_size=3)
+            self.fc1 = nn.Linear(1296, 120)
+            self.fc2 = nn.Linear(120, 84)
+            self.fc3 = nn.Linear(84, 10)
+            self.learning_rate=7e-4 
+            self.n_epochs=20
+            self.batch_size=32
+            
+
+
+
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.max_pool2d(x, kernel_size=2, stride=2)
+        x = F.relu(self.conv2(x))
+        x = F.max_pool2d(x, kernel_size=2, stride=2)
+        x = x.view(x.size(0), -1)
+        x = F.relu(self.fc1(x))
+        x = F.tanh(self.fc2(x))
+        x = self.fc3(x)
+        return F.softmax(x,dim=1)
+
+
+#Function to get train and validation datasets. Please do not make any changes to this function.
+def load_dataset(
+        dataset_name: str,
+):
+    if dataset_name == "MNIST":
+        full_dataset = datasets.MNIST('./data', train=True, download=True,
+                                      transform=transforms.Compose([
+                                          transforms.ToTensor(),
+                                          transforms.Normalize((0.1307,), (0.3081,))]))
+
+        train_dataset, valid_dataset = random_split(full_dataset, [48000, 12000])
+
+    elif dataset_name == "CIFAR10":
+        full_dataset = datasets.CIFAR10(root='./data', train=True, download=True,
+                                        transform=transforms.Compose([
+                                            transforms.ToTensor(),
+                                            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]))
+
+        train_dataset, valid_dataset = random_split(full_dataset, [38000, 12000])
+
+    else:
+        raise Exception("Unsupported dataset.")
+
+    return train_dataset, valid_dataset
+
+
+
+#TO DO: Complete this function. This should train the model and return the final trained model. 
+#Similar to Assignment-1, make sure to print the validation accuracy to see 
+#how the model is performing.
+
+def train(
+        model,
+        train_dataset,
+        valid_dataset,
+        device
+
+):
+
+    #Make sure to fill in the batch size. 
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=model.batch_size, shuffle=True)
+
+    valid_loader = torch.utils.data.DataLoader(
+        valid_dataset, batch_size=200, shuffle=True)
+
+
+    optimizer = optim.Adam(model.parameters(), lr=model.learning_rate)
+
+
+    for epoch in range(1, model.n_epochs + 1):
+        model.train()
+        for batch_idx, (data, target) in enumerate(train_loader):
+            data = data.to(device)
+            target = target.to(device)
+            optimizer.zero_grad()
+            output = model(data)
+            loss = F.cross_entropy(output, target)
+            loss.backward()
+            optimizer.step()
+
+        
+        if epoch%5==0:
+            model.eval()
+            eval(valid_loader,model,"Validation",device)
+
+
+    results = dict(
+        model=model
+    )
+
+    return results
+
+
+
+def eval(data_loader,model,dataset,device):
+  loss = 0
+  correct = 0
+  with torch.no_grad(): # notice the use of no_grad
+    for data, target in data_loader:
+      data = data.to(device)
+      target = target.to(device)
+      output = model(data)
+      pred = output.data.max(1, keepdim=True)[1]
+      correct += pred.eq(target.data.view_as(pred)).sum()
+      loss += F.cross_entropy(output, target).item()
+  loss /= len(data_loader.dataset)
+  print(dataset+'set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(loss, correct, len(data_loader.dataset), 100. * correct / len(data_loader.dataset)))
+
+
+
+
+def CNN(dataset_name, device):
+
+    in_channels=0
+    #CIFAR-10 has 3 channels whereas MNIST has 1.
+    if dataset_name == "CIFAR10":
+        in_channels= 3
+    elif dataset_name == "MNIST":
+        in_channels = 1
+    else:
+        raise AssertionError(f'invalid dataset: {dataset_name}')
+
+    model = Net(in_channels).to(device)
+
+    train_dataset, valid_dataset = load_dataset(dataset_name)
+
+
+    results = train(model, train_dataset, valid_dataset, device)
+
+    return results
+
