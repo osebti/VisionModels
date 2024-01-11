@@ -1,0 +1,50 @@
+import torch
+
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class FNN(nn.Module):
+    def __init__(self, loss_type, num_classes):
+        super(FNN, self).__init__()
+
+        self.loss_type = loss_type
+        self.num_classes = num_classes
+        #self.flatten=nn.Flatten()
+        #self.network=nn.Sequential(
+
+            #self.flatten,
+
+        self.fc1=nn.Linear(28*28,64)
+        #nn.Tanh(),
+        self.fc2=nn.Linear(64,32)
+        #nn.ReLU(),
+        self.fc3=nn.Linear(32,10)
+
+        #)
+    
+
+
+    def forward(self, x):
+
+        x=x.view(x.size(0),-1)
+        x=nn.Tanh()(self.fc1(x))
+        x=nn.ReLU()(self.fc2(x))
+        
+        computation=self.fc3(x)
+        #computation=self.network(x)
+        output = F.softmax(computation,dim=1)
+
+        return output
+
+
+    def get_loss(self, output, target):
+        if self.loss_type=="ce":
+            loss = F.cross_entropy(output,target)
+            
+        else:
+            one_hot = torch.nn.functional.one_hot
+            loss=F.mse_loss(output,one_hot(target,num_classes=10).float())
+
+
+        return loss
