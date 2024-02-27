@@ -51,7 +51,7 @@ class VarianceScheduler:
     self.alpha_bars = torch.tensor([torch.prod(self.alphas[:i + 1]) for i in range(len(self.alphas))])
     self.steps=num_steps
     
-        # NOTE:Feel free to add to this or modify it as you wish
+
 
   
   
@@ -226,7 +226,7 @@ class DiffusionModel(nn.Module):
     
     # step1: sample timesteps
     # step2: compute the noisy versions of the input image according to your timesteps
-    # step3: estimate the noises using your noise estimating network
+    # step3: estimate the noises using the noise estimating network
     # step4: compute the loss between the estimated noises and the true noises
 
     device="cuda" if torch.cuda.is_available() else "cpu"
@@ -257,8 +257,7 @@ class DiffusionModel(nn.Module):
     Returns:
     torch.Tensor: the generated images [num_images, 1, 28, 28]
     """
-    
-    # add your code here
+
     """Given a DDPM model, a number of samples to be generated and a device, returns some newly generated samples"""
     #timesteps = torch.linspace(0, 200,steps=200,dtype=torch.int64)
 
