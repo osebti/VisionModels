@@ -4,9 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-"""
-NOTE: you can add as many functions as you need in this file, and for all the classes you can define extra methods if you need
-"""
+
 
 class VAE(nn.Module):
 	# feel free to define your arguments
@@ -29,8 +27,6 @@ class VAE(nn.Module):
 		nn.Sigmoid())
 
 
- # implement your decoder here
-
 	def forward(self, x: torch.Tensor, y: torch.Tensor):
 		"""
 		Args:
@@ -43,13 +39,7 @@ class VAE(nn.Module):
 				logvar: [B, latent_dim]
 		"""
 		
-		# implement your forward function here
-		
 
-		
-	# mu=None
-	# logvar = None 
-	# reconstructed=None
 
 		x = x.view(x.size(0), -1)
 		
@@ -87,9 +77,7 @@ class VAE(nn.Module):
 		return reconstructed, mu, logvar
 
 	def reparameterize(self, mu: torch.Tensor, logvar: torch.Tensor):
-		"""
-		applies the reparameterization trick
-		"""
+
 		device = torch.device('cuda')
 
 		new_sample = mu + torch.randn(logvar.shape).to(device) * torch.exp(logvar/2.0) # sampling from normal distribution
@@ -98,7 +86,7 @@ class VAE(nn.Module):
 
 	def kl_loss(self, mu, logvar):
 		"""
-		calculates the KL divergence between a normal distribution with mean "mu" and
+		getting the KL divergence between a normal distribution with mean "mu" and
 		log-variance "logvar" and the standard normal distribution (mean=0, var=1)
 		"""
 		
@@ -115,7 +103,7 @@ class VAE(nn.Module):
 
 	def get_loss(self, x: torch.Tensor, y: torch.Tensor):
 		"""
-		given the image x, and the label y calculates the prior loss and reconstruction loss
+		given the image x and the label y this function calculates the prior loss and reconstruction loss
 		"""
 		labels=y
 		reconstructed, mu, logvar = self.forward(x, labels)
